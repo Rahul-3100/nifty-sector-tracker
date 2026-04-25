@@ -58,7 +58,6 @@ def calculate_weekly_quadrants(df):
         sectors.groupby("sector")
         .resample("W")
         .last()
-        .drop(columns=["sector"])
         .reset_index()
     )
     
