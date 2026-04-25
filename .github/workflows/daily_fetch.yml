@@ -5,6 +5,8 @@ on:
     - cron: '0 13 * * 1-5'  # 6:30 PM IST = 13:00 UTC, Monday to Friday
   workflow_dispatch:          # Also allows manual trigger from GitHub UI
 
+permissions:
+  contents: write
 jobs:
   fetch-data:
     runs-on: ubuntu-latest
