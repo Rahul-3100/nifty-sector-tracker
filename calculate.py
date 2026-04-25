@@ -46,6 +46,34 @@ def run_calculations(df):
     df["quadrant"] = df.apply(classify_quadrant, axis=1)
     return df
 
+def calculate_weekly_quadrants(df):
+    # Work only with sector data (no Nifty 50)
+    sectors = df[df["sector"] != "Nifty 50"].copy()
+    
+    # Get the last day of each week for each sector
+    sectors["Date"] = pd.to_datetime(sectors["Date"])
+    sectors = sectors.set_index("Date")
+    
+    weekly = (
+        sectors.groupby("sector")
+        .resample("W")
+        .last()
+        .drop(columns=["sector"])
+        .reset_index()
+    )
+    
+    # Keep only last 12 weeks
+    last_12_weeks = sorted(weekly["Date"].unique())[-12:]
+    weekly = weekly[weekly["Date"].isin(last_12_weeks)]
+    
+    # Format week label as "Apr 21" style
+    weekly["week_label"] = weekly["Date"].dt.strftime("%b %d")
+    
+    return weekly[["sector", "Date", "week_label", "quadrant"]]
+
+
+
+
 if __name__ == "__main__":
     df = pd.read_csv("data/raw_prices.csv", parse_dates=["Date"])
     
