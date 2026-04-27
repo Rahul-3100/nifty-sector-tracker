@@ -1,10 +1,12 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from fetch import fetch_sector_data
-from calculate import run_calculations
+import os
+from sqlalchemy import create_engine
+from dotenv import load_dotenv
 from calculate import calculate_weekly_quadrants
 
+load_dotenv()
 
 # --- Page Config ---
 st.set_page_config(
@@ -13,21 +15,31 @@ st.set_page_config(
     layout="wide"
 )
 
+# --- DB Connection ---
+@st.cache_resource
+def get_engine():
+    db_url = os.getenv("DATABASE_URL")
+    return create_engine(db_url)
+
 # --- Load Data ---
-@st.cache_data(ttl=3600)  # Cache for 1 hour so it doesn't re-fetch on every click
+@st.cache_data(ttl=3600)
 def load_data():
-    df = fetch_sector_data(period="90d")
-    df = run_calculations(df)
+    engine = get_engine()
+    df = pd.read_sql(
+        "SELECT * FROM sector_calculations ORDER BY date, sector",
+        engine
+    )
+    df["date"] = pd.to_datetime(df["date"])
     return df
 
 df = load_data()
 
-# --- Latest snapshot (most recent date per sector) ---
-latest = df.sort_values("Date").groupby("sector").last().reset_index()
+# --- Latest snapshot ---
+latest = df.sort_values("date").groupby("sector").last().reset_index()
 
 # --- Header ---
 st.title("📈 Nifty Sector Rotation Tracker")
-st.caption(f"Data as of: {latest['Date'].max().strftime('%d %b %Y')}")
+st.caption(f"Data as of: {latest['date'].max().strftime('%d %b %Y')}")
 st.markdown("---")
 
 # --- Quadrant Summary Cards ---
@@ -75,18 +87,18 @@ sectors_available = sorted(df["sector"].unique().tolist())
 selected_sectors = st.multiselect(
     "Select sectors to compare:",
     options=sectors_available,
-    default=["Nifty IT", "Nifty Bank"]
+    default=["Nifty IT", "Nifty Bank", "Nifty Energy"]
 )
 
 if selected_sectors:
     filtered = df[df["sector"].isin(selected_sectors)]
     fig = px.line(
         filtered,
-        x="Date",
+        x="date",
         y="rs_ratio",
         color="sector",
         title="Relative Strength vs Nifty 50 Over Time",
-        labels={"rs_ratio": "RS Ratio", "Date": "Date", "sector": "Sector"}
+        labels={"rs_ratio": "RS Ratio", "date": "Date", "sector": "Sector"}
     )
     fig.update_layout(hovermode="x unified")
     st.plotly_chart(fig, use_container_width=True)
@@ -95,17 +107,11 @@ else:
 
 st.markdown("---")
 
-
-
-
-# st.markdown("---")
-
 # --- Weekly Heatmap ---
 st.subheader("Sector Rotation Heatmap (Last 12 Weeks)")
 
 weekly = calculate_weekly_quadrants(df)
 
-# Map quadrants to numbers for color scale
 quadrant_map = {
     "Leading":            3,
     "Weakening":          2,
@@ -116,20 +122,17 @@ quadrant_map = {
 
 weekly["quadrant_num"] = weekly["quadrant"].map(quadrant_map)
 
-# Pivot to matrix: rows = sectors, columns = weeks
 pivot = weekly.pivot(index="sector", columns="week_label", values="quadrant_num")
 
-# Keep weeks in chronological order
-week_order = weekly.drop_duplicates("week_label").sort_values("Date")["week_label"].tolist()
+week_order = weekly.drop_duplicates("week_label").sort_values("date")["week_label"].tolist()
 pivot = pivot[week_order]
 
-# Custom color scale
 colorscale = [
-    [0.00, "#ef4444"],   # Lagging     - red
-    [0.25, "#f97316"],   # placeholder
-    [0.50, "#3b82f6"],   # Improving   - blue
-    [0.75, "#facc15"],   # Weakening   - yellow
-    [1.00, "#22c55e"],   # Leading     - green
+    [0.00, "#ef4444"],
+    [0.25, "#f97316"],
+    [0.50, "#3b82f6"],
+    [0.75, "#facc15"],
+    [1.00, "#22c55e"],
 ]
 
 fig_heatmap = px.imshow(
@@ -148,5 +151,5 @@ fig_heatmap.update_layout(
 
 st.plotly_chart(fig_heatmap, use_container_width=True)
 
-# --- Footer ---
-st.caption("Built with yfinance + Streamlit | Data source: Yahoo Finance")
+st.markdown("---")
+st.caption("Built with yfinance + PostgreSQL + Streamlit | Data source: Yahoo Finance")
