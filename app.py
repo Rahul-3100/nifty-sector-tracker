@@ -75,7 +75,7 @@ sectors_available = sorted(df["sector"].unique().tolist())
 selected_sectors = st.multiselect(
     "Select sectors to compare:",
     options=sectors_available,
-    default=["Nifty IT", "Nifty Bank", "Nifty Energy"]
+    default=["Nifty IT", "Nifty Bank"]
 )
 
 if selected_sectors:
