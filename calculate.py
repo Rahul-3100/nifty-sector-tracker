@@ -6,10 +6,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+@st.cache_resource
 def get_engine():
     db_url = os.getenv("DATABASE_URL")
-    if not db_url:
-        raise ValueError("DATABASE_URL not set in .env")
+    # Fix for SQLAlchemy compatibility
+    if db_url and db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql+psycopg2://", 1)
+    if db_url and db_url.startswith("postgresql://"):
+        db_url = db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
     return create_engine(db_url)
 
 def create_calculations_table(engine):

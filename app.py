@@ -19,6 +19,11 @@ st.set_page_config(
 @st.cache_resource
 def get_engine():
     db_url = os.getenv("DATABASE_URL")
+    # Fix for SQLAlchemy compatibility
+    if db_url and db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql+psycopg2://", 1)
+    if db_url and db_url.startswith("postgresql://"):
+        db_url = db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
     return create_engine(db_url)
 
 # --- Load Data ---

@@ -20,10 +20,14 @@ TICKERS = {
     "^CNXINFRA":  "Nifty Infra",
 }
 
+@st.cache_resource
 def get_engine():
     db_url = os.getenv("DATABASE_URL")
-    if not db_url:
-        raise ValueError("DATABASE_URL not set in .env")
+    # Fix for SQLAlchemy compatibility
+    if db_url and db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql+psycopg2://", 1)
+    if db_url and db_url.startswith("postgresql://"):
+        db_url = db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
     return create_engine(db_url)
 
 def create_tables(engine):
@@ -92,7 +96,7 @@ def save_to_db(df, engine):
                     print(f"WARNING: skipped {row['sector']} {row['date']} — {row_error}")
             conn.commit()
         print("Upsert complete")
-        
+
 if __name__ == "__main__":
     engine = get_engine()
     create_tables(engine)
